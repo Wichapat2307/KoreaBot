@@ -1,0 +1,310 @@
+==============================================================
+                    KOREABOT - USER MANUAL
+==============================================================
+
+KoreaBot makes the TurtleBot drive forward while following a
+line on the floor with its camera:
+
+    - a WHITE line on its RIGHT side
+    - a YELLOW line on its LEFT side
+    - or BOTH, driving in the middle between them
+
+It is made of 3 programs that talk to each other over ROS
+topics (like sending messages):
+
+    line_follow    the "driver": watches the camera and drives
+    color_params   a window to set the line COLOURS
+    robot_params   a window to set SPEED, TURNING, etc.
+                   and START / STOP buttons
+
+
+--------------------------------------------------------------
+1. BEFORE YOU START
+--------------------------------------------------------------
+
+ON THE ROBOT (ubuntu@turtlebot), in its own terminals:
+
+    1. Start the robot (bringup) as usual
+    2. Start the Pi camera:
+           ros2 run camera_ros camera_node
+
+ON YOUR COMPUTER (vcs@ubuntu24) - NOT on the robot:
+
+    KoreaBot runs here, because its windows need a screen.
+
+    If "Package 'koreabot' not found" appears, type this first:
+           source ~/ros2_ws/install/setup.bash
+
+
+--------------------------------------------------------------
+2. START KOREABOT
+--------------------------------------------------------------
+
+All 3 programs at once (easiest):
+
+    ros2 launch koreabot koreabot.launch.py
+
+Or one at a time, each in its own terminal:
+
+    ros2 run koreabot line_follow
+    ros2 run koreabot color_params
+    ros2 run koreabot robot_params
+
+Just watch, never drive (safe for testing):
+
+    ros2 run koreabot line_follow --preview
+
+The robot does NOT move when KoreaBot starts.
+It waits until you tell it to go (see part 3).
+
+
+--------------------------------------------------------------
+3. TELL THE ROBOT WHAT TO DO  (True / False switches)
+--------------------------------------------------------------
+
+There are 3 switches:
+
+    Line follower   True = drive          False = stop
+    White           True = follow white   False = ignore white
+    Yellow          True = follow yellow  False = ignore yellow
+
+When line_follow starts:  Line follower = False (stopped)
+                          White = True, Yellow = False
+
+EASY WAY - the robot window (robot_params):
+
+    START button      = Line follower:True
+    STOP button       = Line follower:False
+    White checkbox    = White:True / False
+    Yellow checkbox   = Yellow:True / False
+
+TERMINAL WAY - copy the WHOLE line, starting with "ros2":
+
+  Drive:
+    ros2 topic pub --once /Linefollow std_msgs/msg/String "data: 'Line follower:True'"
+
+  Stop:
+    ros2 topic pub --once /Linefollow std_msgs/msg/String "data: 'Line follower:False'"
+
+  Follow only WHITE (right side):
+    ros2 topic pub --once /Linefollow std_msgs/msg/String "data: 'White:True, Yellow:False'"
+
+  Follow only YELLOW (left side):
+    ros2 topic pub --once /Linefollow std_msgs/msg/String "data: 'White:False, Yellow:True'"
+
+  Follow BOTH (drive in the middle):
+    ros2 topic pub --once /Linefollow std_msgs/msg/String "data: 'White:True, Yellow:True'"
+
+  Short versions also work:  'True'  = drive,  'False' = stop
+
+  Big and small letters do not matter: 'yellow:true' works too.
+
+What happens with each choice:
+
+    White only    ->  keeps the white line in its ring on the right
+    Yellow only   ->  keeps the yellow line in its ring on the left
+    Both          ->  drives in the middle between the two lines.
+                      If one line disappears, it guesses the middle
+                      from the other line.
+    Neither       ->  stands still, even with Line follower:True
+
+You can switch White / Yellow while the robot is driving.
+
+To start with YELLOW instead of white:
+    ros2 run koreabot line_follow --ros-args -p white:=false -p yellow:=true
+
+
+--------------------------------------------------------------
+4. THE CAMERA WINDOW  (line_follow)
+--------------------------------------------------------------
+
+What you see:
+
+    GREEN dot       the dot is locked onto the line
+    RED circle      the dot lost the line
+    BLUE ring       where the line SHOULD be.
+                    The robot turns to keep the dot inside the ring.
+    BLUE cross      (both lines) the middle of the lane
+    MAGENTA circle  a ceiling light that is being ignored
+    DARK top part   the robot ignores this part of the picture
+                    (above the orange dashed line)
+
+Top left: LOCKED (sees the line) or LOST
+Top right: which line it follows (WHITE / YELLOW / BOTH)
+Bottom bar: what it is doing, and the switches (LF, W, Y)
+
+Keys and mouse:
+
+    click near a line   put the dot on that line
+                        (use this if the dot sits on the wrong thing)
+    m                   show what the robot counts as line colour
+    c                   save a picture (saved as ~/koreabot_....png)
+    q or Esc            quit (the robot stops)
+
+What the robot does, shown at the bottom:
+
+    STOPPED           waiting for Line follower:True
+    FOLLOW            following the line
+    LOST              lost the line for a moment, keeps going
+    SEARCH            turning to look for the line
+                      (white: turns right first, yellow: left first)
+    GAVE UP           could not find the line - it stops and
+                      Line follower goes back to False.
+                      Put it on the line and press START again.
+    NO LINE SELECTED  White and Yellow are both False
+    CAMERA LOST       no pictures from the camera - it stops
+
+
+--------------------------------------------------------------
+5. THE COLOUR WINDOW  (color_params)
+--------------------------------------------------------------
+
+Use this when the robot cannot see the line well
+(for example: a new room or different lights).
+
+The picture shows what the robot sees as each colour:
+
+    BLUE tint   = counts as WHITE line
+    GREEN tint  = counts as YELLOW line
+
+FASTEST WAY - click on the tape:
+
+    LEFT click  on the YELLOW tape  ->  learns the yellow colour
+    RIGHT click on the WHITE tape   ->  learns the white colour
+
+Then check: the tape should be tinted, the floor should NOT.
+
+Sliders (to fine tune by hand):
+
+    white S max       lower  = only very pure white counts
+    white V min       higher = only very bright white counts
+                      (raise it if light reflections count as white)
+    yellow H low/high the range of yellow shades
+    yellow S low      higher = only strong yellow counts
+    yellow V low      higher = only bright yellow counts
+    ignore lights     1 = ignore round ceiling lights
+    light round %     how round a blob must be to be a light
+    light margin x10  how much around a light is ignored
+
+Keys:  d = back to defaults,   q = close
+
+Everything is SAVED automatically and sent to the robot at once.
+
+
+--------------------------------------------------------------
+6. THE ROBOT WINDOW  (robot_params)
+--------------------------------------------------------------
+
+Top:    START / STOP buttons, White / Yellow checkboxes
+Below:  what the robot is doing right now
+        ("line_follow is NOT running" = start line_follow first)
+
+Sliders - point at one with the mouse to see what it does.
+The most useful ones:
+
+  SPEED
+    forward_speed    top speed (max 0.22)
+    min_speed        slowest speed in sharp turns
+    slow_down        how much it slows down when turning
+                     (0 = never slows, 1 = slows a lot)
+    search_speed     forward speed while looking for a lost line
+
+  STEERING
+    kp               how hard it turns (bigger = turns harder)
+    kd               stops wobbling left-right (a little bigger
+                     = calmer)
+    max_turn         fastest turn speed
+    search_rate      turn speed while looking for a lost line
+
+  WHERE THE LINES SHOULD BE  (0 = left edge, 1 = right edge)
+    target_x         where the WHITE line should be
+    yellow_target_x  where the YELLOW line should be
+    center_x         where the middle should be (both lines)
+
+  TRACKING DOTS
+    crop_top         how much of the top of the picture to ignore
+    dot_y            how high up the dots are (0 = top, 1 = bottom)
+
+"Defaults" button = put everything back to the factory values.
+
+Everything is SAVED automatically and sent to the robot at once.
+
+
+--------------------------------------------------------------
+7. QUICK TUNING TIPS
+--------------------------------------------------------------
+
+  Turns are too wide / misses corners
+      -> raise kp and max_turn, or lower forward_speed
+
+  Wobbles left and right on straight parts
+      -> raise kd a little, or lower kp
+
+  Too slow
+      -> raise forward_speed (max 0.22) and min_speed
+
+  Loses the line in sharp turns
+      -> lower forward_speed, raise slow_down
+
+  The dot jumps onto ceiling lights or reflections
+      -> colour window: right-click the white tape again,
+         or raise "white V min"
+
+  Turns the WRONG way (away from the line)
+      -> robot window: tick invert_steering
+
+
+--------------------------------------------------------------
+8. SETTINGS FILES  (edit by hand if you like)
+--------------------------------------------------------------
+
+    ~/ros2_ws/src/KoreaBot/config/colors.py        colours
+    ~/ros2_ws/src/KoreaBot/config/robot_params.py  speed, turning ...
+
+Each line looks like:   forward_speed = 0.18   # what it does [range]
+
+Change the number and save the file - the robot uses it
+straight away. A wrong or out-of-range number is refused and
+the old value is kept (a message appears in the terminal).
+
+
+--------------------------------------------------------------
+9. PROBLEMS
+--------------------------------------------------------------
+
+  "Package 'koreabot' not found"
+      -> source ~/ros2_ws/install/setup.bash
+         (and run it on your computer, not on the robot)
+
+  "Waiting for camera"
+      -> start the Pi camera on the robot:
+             ros2 run camera_ros camera_node
+      -> check the robot is on:  ros2 topic list
+         (you should see /camera/image_raw/compressed)
+
+  "data: ไม่พบคำสั่ง" (command not found)
+      -> copy the WHOLE command, starting with "ros2 topic pub"
+
+  The robot does not move
+      -> did you press START (Line follower:True)?
+      -> is White or Yellow switched on?
+      -> check the bottom bar of the camera window
+
+  See everything the robot reports:
+      ros2 topic echo /Linefollow/status
+
+
+--------------------------------------------------------------
+10. HOW THE PROGRAMS TALK  (for the curious)
+--------------------------------------------------------------
+
+    robot_params ---- /Linefollow ---------> line_follow  (commands)
+    robot_params ---- /Linefollow/params --> line_follow  (speed, turning)
+    color_params ---- /Linefollow/colors --> line_follow  (colours)
+    line_follow ----- /Linefollow/status --> robot_params (what it is doing)
+    line_follow ----- /cmd_vel ------------> robot        (drive)
+    robot ----------- camera --------------> line_follow, color_params
+
+All topic names are listed in koreabot/topics.py.
+
+==============================================================
